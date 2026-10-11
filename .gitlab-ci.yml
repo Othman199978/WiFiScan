@@ -1,0 +1,38 @@
+image: gradle:8.9-jdk17
+
+stages:
+  - build
+
+variables:
+  ANDROID_SDK_ROOT: "$CI_PROJECT_DIR/android-sdk"
+  ANDROID_HOME: "$CI_PROJECT_DIR/android-sdk"
+  GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle"
+  DEBIAN_FRONTEND: "noninteractive"
+
+cache:
+  key: gradle-cache
+  paths:
+    - .gradle/caches/
+    - .gradle/wrapper/
+
+build_android_apk:
+  stage: build
+  before_script:
+    - apt-get update -qq
+    - apt-get install -y --no-install-recommends wget unzip ca-certificates
+    - mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
+    - wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O /tmp/android-commandline-tools.zip
+    - unzip -q /tmp/android-commandline-tools.zip -d "$ANDROID_SDK_ROOT/cmdline-tools"
+    - mv "$ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools" "$ANDROID_SDK_ROOT/cmdline-tools/latest"
+    - export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
+    - yes | sdkmanager --sdk_root="$ANDROID_SDK_ROOT" --licenses >/dev/null || true
+    - sdkmanager --sdk_root="$ANDROID_SDK_ROOT" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+  script:
+    - gradle --no-daemon assembleDebug
+  artifacts:
+    name: "WiFiPilot-APK-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - app/build/outputs/apk/debug/app-debug.apk
+    expire_in: 7 days
+  rules:
+    - when: on_success
